@@ -44,7 +44,7 @@ const envs: Record<string, Partial<StackInput>> = {
     "samlCognitoDomainName": "",
     "samlCognitoFederatedIdentityProviderName": "",
     "hiddenUseCases": {},
-    "modelRegion": "us-east-2",
+    "modelRegion": "us-west-2",
     "modelIds": [
       "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
       "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
