@@ -143,8 +143,9 @@ const TITAN_TEXT_DEFAULT_PARAMS: ConverseInferenceParams = {
 
 const LLAMA_DEFAULT_PARAMS: ConverseInferenceParams = {
   maxTokens: 2048,
-  temperature: 0.6,
-  topP: 0.99,
+  temperature: 0.5,
+  topP: 0.9,
+  stopSequences: ['<|eot_id|>'],
 };
 
 const MISTRAL_DEFAULT_PARAMS: ConverseInferenceParams = {
@@ -175,6 +176,12 @@ const DEEPSEEK_DEFAULT_PARAMS: ConverseInferenceParams = {
   maxTokens: 32768,
   temperature: 0.6,
   topP: 0.95,
+};
+
+const PALMYRA_DEFAULT_PARAMS: ConverseInferenceParams = {
+  maxTokens: 8192,
+  temperature: 1,
+  topP: 0.9,
 };
 
 const USECASE_DEFAULT_PARAMS: UsecaseConverseInferenceParams = {
@@ -357,30 +364,19 @@ const createConverseCommandInputWithoutSystemContext = (
   usecaseConverseInferenceParams: UsecaseConverseInferenceParams
 ) => {
   // Since system is not available, system is also included as user.
+  const system = messages.find((message) => message.role === 'system');
   messages = messages.filter((message) => message.role !== 'system');
-  const conversation = messages.map((message) => ({
-    role:
-      message.role === 'user' || message.role === 'system'
-        ? ConversationRole.USER
-        : ConversationRole.ASSISTANT,
-    content: [{ text: message.content }],
-  }));
+  if (messages.length > 0 && messages[0].role === 'user') {
+    messages[0].content = system?.content + messages[0].content;
+  }
 
-  const usecaseParams = usecaseConverseInferenceParams[normalizeId(id)];
-  const inferenceConfig = usecaseParams
-    ? { ...defaultConverseInferenceParams, ...usecaseParams }
-    : defaultConverseInferenceParams;
-
-  const guardrailConfig = createGuardrailConfig();
-
-  const converseCommandInput: ConverseCommandInput = {
-    modelId: model.modelId,
-    messages: conversation,
-    inferenceConfig: inferenceConfig,
-    guardrailConfig: guardrailConfig,
-  };
-
-  return converseCommandInput;
+  return createConverseCommandInput(
+    messages,
+    id,
+    model,
+    defaultConverseInferenceParams,
+    usecaseConverseInferenceParams
+  );
 };
 
 // ConverseStreamCommandInput has the same structure as ConverseCommandInput, so the input created by "createConverseCommandInput" can be used as is.
@@ -719,6 +715,41 @@ const createBodyVideoNovaReel = (params: GenerateVideoParams) => {
   };
 };
 
+const createBodyVideoNovaReelV11 = (params: GenerateVideoParams) => {
+  if (params.taskType === 'TEXT_VIDEO') {
+    return {
+      taskType: 'TEXT_VIDEO',
+      textToVideoParams: {
+        text: params.prompt,
+        images: params.images,
+      },
+      videoGenerationConfig: {
+        durationSeconds: params.durationSeconds,
+        fps: params.fps,
+        dimension: params.dimension,
+        seed: params.seed,
+      },
+    };
+  } else if (params.taskType === 'MULTI_SHOT_AUTOMATED') {
+    return {
+      taskType: 'MULTI_SHOT_AUTOMATED',
+      multiShotAutomatedParams: {
+        text: params.prompt,
+      },
+      videoGenerationConfig: {
+        durationSeconds: params.durationSeconds,
+        fps: params.fps,
+        dimension: params.dimension,
+        seed: params.seed,
+      },
+    };
+  } else if (params.taskType === 'MULTI_SHOT_MANUAL') {
+    throw new Error('Not implemented yet');
+  } else {
+    throw new Error(`Unknown task type ${params.taskType}`);
+  }
+};
+
 const createBodyVideoLumaRayV2 = (params: GenerateVideoParams) => {
   return {
     prompt: params.prompt,
@@ -1035,6 +1066,22 @@ export const BEDROCK_TEXT_GEN_MODELS: {
     extractConverseOutput: extractConverseOutput,
     extractConverseStreamOutput: extractConverseStreamOutput,
   },
+  'us.meta.llama4-scout-17b-instruct-v1:0': {
+    defaultParams: LLAMA_DEFAULT_PARAMS,
+    usecaseParams: USECASE_DEFAULT_PARAMS,
+    createConverseCommandInput: createConverseCommandInput,
+    createConverseStreamCommandInput: createConverseStreamCommandInput,
+    extractConverseOutput: extractConverseOutput,
+    extractConverseStreamOutput: extractConverseStreamOutput,
+  },
+  'us.meta.llama4-maverick-17b-instruct-v1:0': {
+    defaultParams: LLAMA_DEFAULT_PARAMS,
+    usecaseParams: USECASE_DEFAULT_PARAMS,
+    createConverseCommandInput: createConverseCommandInput,
+    createConverseStreamCommandInput: createConverseStreamCommandInput,
+    extractConverseOutput: extractConverseOutput,
+    extractConverseStreamOutput: extractConverseStreamOutput,
+  },
   'mistral.mistral-7b-instruct-v0:2': {
     defaultParams: MISTRAL_DEFAULT_PARAMS,
     usecaseParams: USECASE_DEFAULT_PARAMS,
@@ -1077,6 +1124,22 @@ export const BEDROCK_TEXT_GEN_MODELS: {
     extractConverseOutput: extractConverseOutput,
     extractConverseStreamOutput: extractConverseStreamOutput,
   },
+  'us.mistral.pixtral-large-2502-v1:0': {
+    defaultParams: MISTRAL_DEFAULT_PARAMS,
+    usecaseParams: USECASE_DEFAULT_PARAMS,
+    createConverseCommandInput: createConverseCommandInput,
+    createConverseStreamCommandInput: createConverseStreamCommandInput,
+    extractConverseOutput: extractConverseOutput,
+    extractConverseStreamOutput: extractConverseStreamOutput,
+  },
+  'eu.mistral.pixtral-large-2502-v1:0': {
+    defaultParams: MISTRAL_DEFAULT_PARAMS,
+    usecaseParams: USECASE_DEFAULT_PARAMS,
+    createConverseCommandInput: createConverseCommandInput,
+    createConverseStreamCommandInput: createConverseStreamCommandInput,
+    extractConverseOutput: extractConverseOutput,
+    extractConverseStreamOutput: extractConverseStreamOutput,
+  },
   'cohere.command-r-v1:0': {
     defaultParams: COMMANDR_DEFAULT_PARAMS,
     usecaseParams: USECASE_DEFAULT_PARAMS,
@@ -1111,6 +1174,14 @@ export const BEDROCK_TEXT_GEN_MODELS: {
     extractConverseStreamOutput: extractConverseStreamOutput,
   },
   'amazon.nova-micro-v1:0': {
+    defaultParams: NOVA_DEFAULT_PARAMS,
+    usecaseParams: USECASE_DEFAULT_PARAMS,
+    createConverseCommandInput: createConverseCommandInput,
+    createConverseStreamCommandInput: createConverseStreamCommandInput,
+    extractConverseOutput: extractConverseOutput,
+    extractConverseStreamOutput: extractConverseStreamOutput,
+  },
+  'us.amazon.nova-premier-v1:0': {
     defaultParams: NOVA_DEFAULT_PARAMS,
     usecaseParams: USECASE_DEFAULT_PARAMS,
     createConverseCommandInput: createConverseCommandInput,
@@ -1198,6 +1269,25 @@ export const BEDROCK_TEXT_GEN_MODELS: {
     extractConverseOutput: extractConverseOutput,
     extractConverseStreamOutput: extractConverseStreamOutput,
   },
+  // Although Palmyra supports system context, the model seems work best without it.
+  'us.writer.palmyra-x4-v1:0': {
+    defaultParams: PALMYRA_DEFAULT_PARAMS,
+    usecaseParams: USECASE_DEFAULT_PARAMS,
+    createConverseCommandInput: createConverseCommandInputWithoutSystemContext,
+    createConverseStreamCommandInput:
+      createConverseStreamCommandInputWithoutSystemContext,
+    extractConverseOutput: extractConverseOutput,
+    extractConverseStreamOutput: extractConverseStreamOutput,
+  },
+  'us.writer.palmyra-x5-v1:0': {
+    defaultParams: PALMYRA_DEFAULT_PARAMS,
+    usecaseParams: USECASE_DEFAULT_PARAMS,
+    createConverseCommandInput: createConverseCommandInputWithoutSystemContext,
+    createConverseStreamCommandInput:
+      createConverseStreamCommandInputWithoutSystemContext,
+    extractConverseOutput: extractConverseOutput,
+    extractConverseStreamOutput: extractConverseStreamOutput,
+  },
 };
 
 // Definition of parameters and functions for each image generation model
@@ -1260,6 +1350,9 @@ export const BEDROCK_VIDEO_GEN_MODELS: {
 } = {
   'amazon.nova-reel-v1:0': {
     createBodyVideo: createBodyVideoNovaReel,
+  },
+  'amazon.nova-reel-v1:1': {
+    createBodyVideo: createBodyVideoNovaReelV11,
   },
   'luma.ray-v2:0': {
     createBodyVideo: createBodyVideoLumaRayV2,
