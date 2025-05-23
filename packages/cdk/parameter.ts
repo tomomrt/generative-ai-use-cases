@@ -46,6 +46,8 @@ const envs: Record<string, Partial<StackInput>> = {
     "hiddenUseCases": {},
     "modelRegion": "us-west-2",
     "modelIds": [
+      "us.anthropic.claude-sonnet-4-20250514-v1:0",
+      "us.anthropic.claude-opus-4-20250514-v1:0",
       "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
       "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
       "us.anthropic.claude-3-5-haiku-20241022-v1:0",
