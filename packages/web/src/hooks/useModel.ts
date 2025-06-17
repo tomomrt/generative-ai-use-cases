@@ -1,5 +1,8 @@
 import { Model, ModelConfiguration } from 'generative-ai-use-cases';
-import { modelMetadata } from '@generative-ai-use-cases/common';
+import {
+  CRI_PREFIX_PATTERN,
+  modelMetadata,
+} from '@generative-ai-use-cases/common';
 
 const modelRegion = import.meta.env.VITE_APP_MODEL_REGION;
 
@@ -15,10 +18,17 @@ const bedrockModelConfigs = (
 const bedrockModelIds: string[] = bedrockModelConfigs.map(
   (model) => model.modelId
 );
+const lightModelIds: string[] = bedrockModelConfigs
+  .filter((model) => modelMetadata[model.modelId].flags.light)
+  .map((model) => model.modelId);
 const modelIdsInModelRegion: string[] = bedrockModelConfigs
   .filter((model) => model.region === modelRegion)
   .map((model) => model.modelId);
-
+const duplicateBaseModelIds = new Set(
+  bedrockModelIds
+    .map((modelId) => modelId.replace(CRI_PREFIX_PATTERN, ''))
+    .filter((item, index, arr) => arr.indexOf(item) !== index)
+);
 const visionModelIds: string[] = bedrockModelIds.filter(
   (modelId) => modelMetadata[modelId].flags.image
 );
@@ -156,7 +166,15 @@ export const findModelByModelId = (modelId: string) => {
 const searchAgent = agentNames.find((name) => name.includes('Search'));
 
 const modelDisplayName = (modelId: string): string => {
-  return modelMetadata[modelId]?.displayName ?? modelId;
+  // If there are multiple instances of the same model, add CRI suffix to the display name
+  let displayName = modelMetadata[modelId]?.displayName ?? modelId;
+  if (duplicateBaseModelIds.has(modelId.replace(CRI_PREFIX_PATTERN, ''))) {
+    const criMatch = modelId.match(CRI_PREFIX_PATTERN);
+    if (criMatch) {
+      displayName += ` (${criMatch[1].toUpperCase()})`;
+    }
+  }
+  return displayName;
 };
 
 export const MODELS = {
@@ -165,6 +183,7 @@ export const MODELS = {
   modelIdsInModelRegion,
   modelMetadata,
   modelDisplayName,
+  lightModelIds,
   visionModelIds: visionModelIds,
   visionEnabled: visionEnabled,
   imageGenModelIds: imageGenModelIds,

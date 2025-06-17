@@ -10,6 +10,7 @@ import {
   Transcribe,
   CommonWebAcl,
   SpeechToSpeech,
+  McpApi,
 } from './construct';
 import { CfnWebACLAssociation } from 'aws-cdk-lib/aws-wafv2';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
@@ -17,6 +18,7 @@ import { ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
 import { Agent } from 'generative-ai-use-cases';
 import { UseCaseBuilder } from './construct/use-case-builder';
 import { ProcessedStackInput } from './stack-input';
+import { allowS3AccessWithSourceIpCondition } from './utils/s3-access-policy';
 
 export interface GenerativeAiUseCasesStackProps extends StackProps {
   readonly params: ProcessedStackInput;
@@ -74,11 +76,13 @@ export class GenerativeAiUseCasesStack extends Stack {
       queryDecompositionEnabled: params.queryDecompositionEnabled,
       rerankingModelId: params.rerankingModelId,
       crossAccountBedrockRoleArn: params.crossAccountBedrockRoleArn,
-
+      allowedIpV4AddressRanges: params.allowedIpV4AddressRanges,
+      allowedIpV6AddressRanges: params.allowedIpV6AddressRanges,
       userPool: auth.userPool,
       idPool: auth.idPool,
       userPoolClient: auth.client,
       table: database.table,
+      statsTable: database.statsTable,
       knowledgeBaseId: params.ragKnowledgeBaseId || props.knowledgeBaseId,
       agents: props.agents,
       guardrailIdentify: props.guardrailIdentifier,
@@ -116,6 +120,15 @@ export class GenerativeAiUseCasesStack extends Stack {
       crossAccountBedrockRoleArn: params.crossAccountBedrockRoleArn,
     });
 
+    // MCP
+    let mcpEndpoint: string | null = null;
+    if (params.mcpEnabled) {
+      const mcpApi = new McpApi(this, 'McpApi', {
+        idPool: auth.idPool,
+      });
+      mcpEndpoint = mcpApi.endpoint;
+    }
+
     // Web Frontend
     const web = new Web(this, 'Api', {
       // Auth
@@ -148,6 +161,8 @@ export class GenerativeAiUseCasesStack extends Stack {
       speechToSpeechNamespace: speechToSpeech.namespace,
       speechToSpeechEventApiEndpoint: speechToSpeech.eventApiEndpoint,
       speechToSpeechModelIds: params.speechToSpeechModelIds,
+      mcpEnabled: params.mcpEnabled,
+      mcpEndpoint,
       // Frontend
       hiddenUseCases: params.hiddenUseCases,
       // Custom Domain
@@ -174,8 +189,19 @@ export class GenerativeAiUseCasesStack extends Stack {
       // Allow downloading files from the File API to the data source Bucket
       // If you are importing existing Kendra, there is a possibility that the data source is not S3
       // In that case, rag.dataSourceBucketName will be undefined and the permission will not be granted
-      if (rag.dataSourceBucketName) {
-        api.allowDownloadFile(rag.dataSourceBucketName);
+      if (
+        rag.dataSourceBucketName &&
+        api.getFileDownloadSignedUrlFunction.role
+      ) {
+        allowS3AccessWithSourceIpCondition(
+          rag.dataSourceBucketName,
+          api.getFileDownloadSignedUrlFunction.role,
+          'read',
+          {
+            ipv4: params.allowedIpV4AddressRanges,
+            ipv6: params.allowedIpV6AddressRanges,
+          }
+        );
       }
     }
 
@@ -192,8 +218,19 @@ export class GenerativeAiUseCasesStack extends Stack {
           api: api.api,
         });
         // Allow downloading files from the File API to the data source Bucket
-        if (props.knowledgeBaseDataSourceBucketName) {
-          api.allowDownloadFile(props.knowledgeBaseDataSourceBucketName);
+        if (
+          props.knowledgeBaseDataSourceBucketName &&
+          api.getFileDownloadSignedUrlFunction.role
+        ) {
+          allowS3AccessWithSourceIpCondition(
+            props.knowledgeBaseDataSourceBucketName,
+            api.getFileDownloadSignedUrlFunction.role,
+            'read',
+            {
+              ipv4: params.allowedIpV4AddressRanges,
+              ipv6: params.allowedIpV6AddressRanges,
+            }
+          );
         }
       }
     }
@@ -211,6 +248,8 @@ export class GenerativeAiUseCasesStack extends Stack {
       userPool: auth.userPool,
       idPool: auth.idPool,
       api: api.api,
+      allowedIpV4AddressRanges: params.allowedIpV4AddressRanges,
+      allowedIpV6AddressRanges: params.allowedIpV6AddressRanges,
     });
 
     // Cfn Outputs
@@ -330,6 +369,14 @@ export class GenerativeAiUseCasesStack extends Stack {
 
     new CfnOutput(this, 'SpeechToSpeechModelIds', {
       value: JSON.stringify(params.speechToSpeechModelIds),
+    });
+
+    new CfnOutput(this, 'McpEnabled', {
+      value: params.mcpEnabled.toString(),
+    });
+
+    new CfnOutput(this, 'McpEndpoint', {
+      value: mcpEndpoint ?? '',
     });
 
     this.userPool = auth.userPool;
