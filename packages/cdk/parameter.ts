@@ -105,6 +105,7 @@ const envs: Record<string, Partial<StackInput>> = {
     "searchApiKey": "",
     "agents": [],
     "inlineAgents": false,
+    "mcpEnabled": true,
     "flows": [],
     "allowedIpV4AddressRanges": null,
     "allowedIpV6AddressRanges": null,
