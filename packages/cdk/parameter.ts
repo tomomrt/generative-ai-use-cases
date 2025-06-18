@@ -80,11 +80,24 @@ const envs: Record<string, Partial<StackInput>> = {
       "stability.stable-image-core-v1:1",
       "stability.stable-image-ultra-v1:0",
       "stability.stable-image-ultra-v1:1",
-      "stability.stable-diffusion-xl-v1"
+      "stability.stable-diffusion-xl-v1",
+      {
+        "modelId": "amazon.nova-canvas-v1:0",
+        "region": "us-east-1"
+      }
     ],
     "videoGenerationModelIds": [
-    "amazon.nova-reel-v1:0",
-    "luma.ray-v2:0"
+    "luma.ray-v2:0",
+            {
+        "modelId": "amazon.nova-reel-v1:1",
+        "region": "us-east-1"
+      }
+    ],
+    "speechToSpeechModelIds": [
+      {
+        "modelId": "amazon.nova-sonic-v1:0",
+        "region": "us-east-1"
+      }
     ],
     "endpointNames": [],
     "agentEnabled": false,
